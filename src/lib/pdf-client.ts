@@ -1,29 +1,11 @@
 /**
  * Client-side PDF processing — everything runs in the browser.
  *
- * - XMP metadata read/write via pdf-lib (already browser-compatible)
- * - Text extraction via pdfjs-dist (Mozilla PDF.js)
- * - PDF page rendering via pdfjs-dist for preview
+ * - XMP metadata read/write via pdf-lib
  */
 import { PDFDocument } from "pdf-lib";
 
-// ─── Lazy-loaded PDF.js (avoids SSR issues with DOMMatrix, etc.) ─────────────
-
-type PdfjsLib = typeof import("pdfjs-dist");
-let _pdfjsLib: PdfjsLib | null = null;
-
-async function getPdfjs(): Promise<PdfjsLib> {
-  if (_pdfjsLib) return _pdfjsLib;
-  const lib = await import("pdfjs-dist");
-  lib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
-  _pdfjsLib = lib;
-  return lib;
-}
-
-// ─── XMP helpers (same logic as the old server-side pdf-utils) ───────────────
+// ─── XMP helpers ─────────────────────────────────────────────────────────────
 
 function extractXmpXml(pdfBytes: Uint8Array): string | null {
   const text = new TextDecoder("latin1").decode(pdfBytes);
@@ -165,62 +147,3 @@ function buildXmpPacket(metadata: Record<string, string>): string {
 <?xpacket end="w"?>`;
 }
 
-// ─── PDF Preview (render page to canvas) ─────────────────────────────────────
-
-/**
- * Get the total number of pages in a PDF.
- */
-export async function getPdfPageCount(pdfBytes: Uint8Array): Promise<number> {
-  const pdfjsLib = await getPdfjs();
-  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice() });
-  const doc = await loadingTask.promise;
-  return doc.numPages;
-}
-
-/**
- * Get the natural (scale=1) dimensions of a PDF page.
- */
-export async function getPdfPageSize(
-  pdfBytes: Uint8Array,
-  pageNumber: number = 1
-): Promise<{ width: number; height: number }> {
-  const pdfjsLib = await getPdfjs();
-  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice() });
-  const doc = await loadingTask.promise;
-  const page = await doc.getPage(pageNumber);
-  const viewport = page.getViewport({ scale: 1 });
-  return { width: viewport.width, height: viewport.height };
-}
-
-/**
- * Render a single page of a PDF to a canvas, and return the text layer items
- * so the caller can build a selectable text overlay.
- */
-export async function renderPdfPage(
-  pdfBytes: Uint8Array,
-  pageNumber: number,
-  scale: number = 1.5
-): Promise<{
-  canvas: HTMLCanvasElement;
-  width: number;
-  height: number;
-  textContent: import("pdfjs-dist/types/src/display/api").TextContent;
-  viewport: import("pdfjs-dist").PageViewport;
-}> {
-  const pdfjsLib = await getPdfjs();
-  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice() });
-  const doc = await loadingTask.promise;
-  const page = await doc.getPage(pageNumber);
-
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-
-  const ctx = canvas.getContext("2d")!;
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  const textContent = await page.getTextContent();
-
-  return { canvas, width: viewport.width, height: viewport.height, textContent, viewport };
-}

@@ -74,7 +74,6 @@ src/
 - **[TypeScript](https://www.typescriptlang.org/)**
 - **[Tailwind CSS v4](https://tailwindcss.com/)**
 - **[pdf-lib](https://pdf-lib.js.org/)** – Pure-JS PDF manipulation & XMP embedding
-- **[pdfjs-dist](https://mozilla.github.io/pdf.js/)** – PDF page rendering & text layer (client-side)
 
 ## Resume Metadata Standard
 
